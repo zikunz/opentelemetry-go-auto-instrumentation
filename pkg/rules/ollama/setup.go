@@ -164,7 +164,7 @@ func clientGenerateOnEnter(call api.CallContext, c *ollamaapi.Client, ctx contex
 	call.SetParam(1, ctx)
 	var streamState *streamingState
 	if isStreaming {
-		streamState = newStreamingState(req.Model)
+		streamState = newStreamingState()
 	}
 	var finalResponse ollamaapi.GenerateResponse
 	var wrappedFn ollamaapi.GenerateResponseFunc = func(resp ollamaapi.GenerateResponse) error {
@@ -265,7 +265,7 @@ func clientChatOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 	call.SetParam(1, ctx)
 	var streamState *streamingState
 	if isStreaming {
-		streamState = newStreamingState(req.Model)
+		streamState = newStreamingState()
 	}
 	var finalResponse ollamaapi.ChatResponse
 	var wrappedFn ollamaapi.ChatResponseFunc = func(resp ollamaapi.ChatResponse) error {
