@@ -139,7 +139,6 @@ func extractOptionsFromMap(opts map[string]interface{}) (
 	return
 }
 
-
 //go:linkname clientGenerateOnEnter github.com/ollama/ollama/api.clientGenerateOnEnter
 func clientGenerateOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.GenerateRequest, fn ollamaapi.GenerateResponseFunc) {
 	isStreaming := req.Stream == nil || (req.Stream != nil && *req.Stream)
@@ -240,7 +239,6 @@ func clientGenerateOnExit(call api.CallContext, err error) {
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }
 
-
 //go:linkname clientChatOnEnter github.com/ollama/ollama/api.clientChatOnEnter
 func clientChatOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.ChatRequest, fn ollamaapi.ChatResponseFunc) {
 	isStreaming := req.Stream == nil || (req.Stream != nil && *req.Stream)
@@ -325,7 +323,7 @@ func clientChatOnExit(call api.CallContext, err error) {
 				ollamaResp.promptTokens = streamState.promptEvalCount
 				ollamaResp.completionTokens = streamState.evalCount
 			} else {
-					ollamaResp.promptTokens = respPtr.PromptEvalCount
+				ollamaResp.promptTokens = respPtr.PromptEvalCount
 				ollamaResp.completionTokens = respPtr.EvalCount
 				ollamaResp.content = respPtr.Message.Content
 			}
