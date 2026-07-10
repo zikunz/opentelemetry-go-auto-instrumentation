@@ -125,7 +125,8 @@ type ollamaResponse struct {
 	promptTokens     int
 	completionTokens int
 
-	content string
+	content    string
+	doneReason string
 
 	err error
 

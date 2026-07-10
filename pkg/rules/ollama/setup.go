@@ -273,6 +273,7 @@ func clientGenerateOnExit(call api.CallContext, err error) {
 	}
 	if err == nil {
 		if respPtr, ok := data["finalResponsePtr"].(*ollamaapi.GenerateResponse); ok && respPtr != nil {
+			ollamaResp.doneReason = respPtr.DoneReason
 			if isStreaming && streamState != nil {
 				ollamaResp.content = streamState.responseBuilder.String()
 				ollamaResp.promptTokens = streamState.promptEvalCount
@@ -374,6 +375,7 @@ func clientChatOnExit(call api.CallContext, err error) {
 	}
 	if err == nil {
 		if respPtr, ok := data["finalResponsePtr"].(*ollamaapi.ChatResponse); ok && respPtr != nil {
+			ollamaResp.doneReason = respPtr.DoneReason
 			if isStreaming && streamState != nil {
 				ollamaResp.content = streamState.responseBuilder.String()
 				ollamaResp.promptTokens = streamState.promptEvalCount
