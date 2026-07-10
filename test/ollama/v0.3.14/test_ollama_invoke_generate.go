@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/alibaba/loongsuite-go/test/verifier"
 	"github.com/ollama/ollama/api"
@@ -39,6 +40,31 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Second request: the reply is cut off by the token limit, done_reason "length".
+	truncatedClient, truncatedServer := SetupMockGenerate(api.GenerateResponse{
+		Model:      "llama3:8b",
+		CreatedAt:  time.Now(),
+		Response:   "truncated output",
+		Done:       true,
+		DoneReason: "length",
+		Metrics: api.Metrics{
+			PromptEvalCount: 5,
+			EvalCount:       7,
+		},
+	})
+	defer truncatedServer.Close()
+	err = truncatedClient.Generate(ctx, &api.GenerateRequest{
+		Model:  "llama3:8b",
+		Prompt: "Hello",
+		Stream: &streamFlag,
+	}, func(resp api.GenerateResponse) error {
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
 		verifier.VerifyLLMAttributes(stubs[0][0], "generate", "ollama", "llama3:8b")
 		input, _ := getAttributeValue(stubs[0][0], "gen_ai.input.messages").(string)
@@ -46,5 +72,10 @@ func main() {
 		if input != want {
 			panic(fmt.Sprintf("gen_ai.input.messages = %q, want %q", input, want))
 		}
-	}, 1)
+
+		reasons, _ := getAttributeValue(stubs[1][0], "gen_ai.response.finish_reasons").([]string)
+		if len(reasons) != 1 || reasons[0] != "length" {
+			panic(fmt.Sprintf("gen_ai.response.finish_reasons = %v, want [length]", reasons))
+		}
+	}, 2)
 }
