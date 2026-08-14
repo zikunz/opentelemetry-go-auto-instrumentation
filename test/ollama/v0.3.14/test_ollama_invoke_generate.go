@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/alibaba/loongsuite-go/test/verifier"
 	"github.com/ollama/ollama/api"
@@ -40,5 +41,10 @@ func main() {
 	}
 	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
 		verifier.VerifyLLMAttributes(stubs[0][0], "generate", "ollama", "llama3:8b")
+		input, _ := getAttributeValue(stubs[0][0], "gen_ai.input.messages").(string)
+		want := `[{"role":"user","parts":[{"type":"text","content":"Hello"}]}]`
+		if input != want {
+			panic(fmt.Sprintf("gen_ai.input.messages = %q, want %q", input, want))
+		}
 	}, 1)
 }

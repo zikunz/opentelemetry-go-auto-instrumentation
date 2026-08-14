@@ -17,14 +17,11 @@ package ollama
 import (
 	"strings"
 	"time"
-
-	"github.com/ollama/ollama/api"
 )
 
 type ollamaRequest struct {
 	operationType string
 	model         string
-	messages      []api.Message
 	prompt        string
 
 	promptTokens     int
