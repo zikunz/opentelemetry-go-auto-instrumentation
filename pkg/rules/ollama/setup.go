@@ -16,6 +16,7 @@ package ollama
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"reflect"
 	"unsafe"
@@ -139,15 +140,84 @@ func extractOptionsFromMap(opts map[string]interface{}) (
 	return
 }
 
+// The gen_ai.input.messages format has one struct per part type, so each part
+// carries exactly the fields the schema defines for it.
+type inputMessage struct {
+	Role  string        `json:"role"`
+	Parts []interface{} `json:"parts"`
+}
+
+type textPart struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
+type toolCallPart struct {
+	Type      string          `json:"type"`
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+}
+
+type toolCallResponsePart struct {
+	Type     string `json:"type"`
+	Response string `json:"response"`
+}
+
+// serializeInputMessages renders messages in the gen_ai.input.messages
+// format, with one {role, parts} entry per message. Text becomes a text part,
+// tool calls become tool_call parts and the content of a tool message becomes
+// a tool_call_response part. Images are left out so raw image bytes never end
+// up on a span.
+func serializeInputMessages(messages []ollamaapi.Message) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	out := make([]inputMessage, 0, len(messages))
+	for _, m := range messages {
+		parts := make([]interface{}, 0, 1+len(m.ToolCalls))
+		if m.Role == "tool" {
+			parts = append(parts, toolCallResponsePart{Type: "tool_call_response", Response: m.Content})
+		} else if m.Content != "" {
+			parts = append(parts, textPart{Type: "text", Content: m.Content})
+		}
+		for _, toolCall := range m.ToolCalls {
+			arguments, err := json.Marshal(toolCall.Function.Arguments)
+			// Missing arguments marshal as null on ollama v0.3.14 and as {} on
+			// newer SDKs. Drop the key in both cases, and when the arguments
+			// cannot be marshaled at all, so the rest of the conversation is
+			// still recorded.
+			if err != nil || string(arguments) == "null" || string(arguments) == "{}" {
+				arguments = nil
+			}
+			parts = append(parts, toolCallPart{
+				Type:      "tool_call",
+				Name:      toolCall.Function.Name,
+				Arguments: arguments,
+			})
+		}
+		out = append(out, inputMessage{Role: m.Role, Parts: parts})
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 //go:linkname clientGenerateOnEnter github.com/ollama/ollama/api.clientGenerateOnEnter
 func clientGenerateOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.GenerateRequest, fn ollamaapi.GenerateResponseFunc) {
 	isStreaming := req.Stream == nil || (req.Stream != nil && *req.Stream)
 	temp, maxTok, tk, tp, fp, pp, stop, seed := extractOptionsFromMap(req.Options)
 
+	var inputMsgs []ollamaapi.Message
+	if req.Prompt != "" {
+		inputMsgs = []ollamaapi.Message{{Role: "user", Content: req.Prompt}}
+	}
 	ollamaReq := ollamaRequest{
 		operationType:    "generate",
 		model:            req.Model,
 		prompt:           req.Prompt,
+		input:            serializeInputMessages(inputMsgs),
 		isStreaming:      isStreaming,
 		serverAddress:    extractServerAddress(c),
 		temperature:      temp,
@@ -247,7 +317,7 @@ func clientChatOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 	ollamaReq := ollamaRequest{
 		operationType:    "chat",
 		model:            req.Model,
-		messages:         req.Messages,
+		input:            serializeInputMessages(req.Messages),
 		isStreaming:      isStreaming,
 		serverAddress:    extractServerAddress(c),
 		temperature:      temp,
