@@ -16,6 +16,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/alibaba/loongsuite-go/test/verifier"
 	"github.com/ollama/ollama/api"
@@ -40,5 +42,21 @@ func main() {
 	}
 	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
 		verifier.VerifyLLMAttributes(stubs[0][0], "generate", "ollama", "llama3:8b")
+		input, _ := getAttributeValue(stubs[0][0], "gen_ai.input.messages").(string)
+		if input == "" {
+			panic("gen_ai.input.messages not found on generate span")
+		}
+		var messages []struct {
+			Role  string `json:"role"`
+			Parts []struct {
+				Type    string `json:"type"`
+				Content string `json:"content"`
+			} `json:"parts"`
+		}
+		if err := json.Unmarshal([]byte(input), &messages); err != nil || len(messages) != 1 ||
+			messages[0].Role != "user" || len(messages[0].Parts) != 1 ||
+			messages[0].Parts[0].Type != "text" || messages[0].Parts[0].Content != "Hello" {
+			panic(fmt.Sprintf("unexpected gen_ai.input.messages: %s", input))
+		}
 	}, 1)
 }
