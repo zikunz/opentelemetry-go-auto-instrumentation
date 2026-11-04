@@ -111,6 +111,9 @@ func (o ollamaAttrsGetter) GetAIResponseFinishReasons(request ollamaRequest, res
 	if response.err != nil {
 		return []string{"error"}
 	}
+	if response.doneReason != "" {
+		return []string{response.doneReason}
+	}
 	return []string{"stop"}
 }
 
